@@ -1,7 +1,8 @@
+const chalk = require('chalk');
 const { Pool } = require('pg');
 const config = {
     user: 'postgres',
-    password: 'umut1985',
+    password: '1234',
     host: '127.0.0.1',
     port: '5432',
     database: 'always_music',
@@ -10,69 +11,132 @@ const config = {
     idleTimeoutMillis: 20000,
     connectionTimeoutMillis: 2000
 };
-
-/* ejemplo para entender process.argv -> console.log(process.argv)
-process.argv retorna un array con  2 elementos tipo String que reflejan la
-dirección del recurso que se está ocupando
-
-otro ejemplo -> 
-const argumentos = process.argv.slice(2)
-let num1 = Number(argumentos[0])
-let num2 = Number(argumentos[1])
-console.log(num1 * num2)
-node server.js 2 2 
-despues de server.js lo siguiente son parametros en la posicion 0 y 1 ya que process retorna un objeto
-*/
-
 const pool = new Pool(config)
-//module.exports = pool;
 
+//funcion para conectar a postgres y crear una instancia de client
+const conectar = async()=>{
+    let client;
+    try{
+        client = await pool.connect();
+        return client;
+    }catch(err){
+        const { code } = err;
+        console.error("Error al conectarse al servidor:", err);
+        console.error("Codigo Error:", code);
+    }finally{
+        pool.end();
+    }
+}
+
+//registar usuario llama a conectar quien retorna(client) una instancia de la conexion
 const registrarUsuario = async()=>{
-    const text = 
-    "INSERT INTO estudiantes (nombre, rut, curso, nivel) VALUES ($1,$2,$3,$4) RETURNING *";
-    const proceso = process.argv.slice(2);
-    const values = [proceso[1], proceso[2], proceso[3], proceso[4]];
-    const result = await pool.query(text, values);
-    console.info('Estudiante ' + proceso[1] + ' registrado con exito');
-};//para agregar un usuario ejemplo -> node server.js nuevo 'Frank' '6' 'Java' 'alto'
+    const client = await conectar();
+    try{
+        const proceso = process.argv.slice(2);
+        const consulta = {
+            text: "INSERT INTO estudiantes (nombre, rut, curso, nivel) VALUES ($1,$2,$3,$4) RETURNING *",
+            values: [proceso[1], proceso[2], proceso[3], proceso[4]],
+            rowMode: "array"
+        }
+        const result = await client.query(consulta);
+        console.info('Estudiante ' + proceso[1] + ' registrado con exito');
+        console.info(result.rows);
+    }catch(err){
+        const { code } = err;
+        console.error('Error al registrar estudiante: ', err);
+        console.error('Codigo de error ', code);
+    }finally{
+        client.release();
+    }
+}
+//para agregar un usuario ejemplo -> node server.js nuevo 'Frank' '6' 'Java' 'alto'
 
-
+//consultar usuario por rut llama a conectar quien retorna(client) una instancia de la conexion
 const consultarRut = async()=>{
-    const text = "SELECT * FROM estudiantes WHERE rut =$1";
-    const proceso = process.argv.slice(3);
-    const values = [proceso[2]];
-    const resultado = await pool.query(text, values);
-    console.log("Registro actual ", resultado.rows);
+    const client = await conectar();
+    try{
+        const proceso = process.argv.slice(2);
+        const consulta = {
+            text: "SELECT * FROM estudiantes WHERE rut =$1",
+            values: [proceso[2]],
+            rowMode: "array"
+        }
+        const resultado = await client.query(consulta);
+        console.log("Registro actual ", resultado.rows);
+    }catch(err){
+        const { code } = err;
+        console.error("Al consultar rut Error:", err);
+        console.error("codigo de Error:", code);
+    }finally{
+        client.release();
+    }
 };//para consultar utilizar ejemplo -> node server.js rut - 6
 
 
 const editar = async()=>{
-    const text = 
-    "UPDATE estudiantes SET (nombre, rut, curso, nivel) = ($1,$2,$3,$4) WHERE id = $5 RETURNING *";
-    const proceso = process.argv.slice(2);
-    const values = [proceso[1], proceso[2], proceso[3], proceso[4], proceso[5]];
-    const result = await pool.query(text, values);
-    console.info('Estudiante ' + proceso[1] + ' actualizado con exito');
-}// para editar ejemplo -> node server.js editar 'magdalena' '6' 'vicente' 'medio' '6'
+    const client = await conectar();
+    try{
+        const proceso = process.argv.slice(2);
+        const consulta = {
+            text: "UPDATE estudiantes SET (nombre, rut, curso, nivel) = ($1,$2,$3,$4) WHERE id = $5 RETURNING *",
+            values: [proceso[1], proceso[2], proceso[3], proceso[4], proceso[5]],
+            rowMode: "array"
+        };
+        const resultado = await client.query(consulta);
+        console.info('Estudiante ' + proceso[1] + ' actualizado con exito');
+        console.info('-----------------------------------------------------');
+        console.info(resultado.rows);
+    }catch(err){
+        const { code } = err;
+        console.error("Error al actualizar:", err);
+        console.error("Codigo de error:", code);
+    }finally{
+        client.release();
+    }
+};// para editar ejemplo -> node server.js editar 'Luis' '6' 'Bootstrap' 'medio' '1'
                                                 //nombre, rut, curso, nivel, id
 
 
 const consultarTodo = async()=>{
-    const text = 'SELECT * FROM estudiantes';
-    const resultado = await pool.query(text);
-    console.info(JSON.stringify(resultado.rows, null, 2));
+    const client = await conectar();
+    try{
+        const consulta = {
+            text: 'SELECT * FROM estudiantes',
+            rowMode: "array"
+        }
+        const resultado = await client.query(consulta);
+        console.info(JSON.stringify(resultado.rows, null, 2));
+    }catch(err){
+        const { code } = err;
+        console.error("Error al consultar:", err);
+        console.error("Codigo de error:", code);
+    }finally{
+        client.release();
+    }
 }// ejemplo -> node server.js consulta
 
 const eliminar = async()=>{
-    const proceso = process.argv.slice(2);
-    const values = [proceso[2]];
-    const text = "DELETE FROM estudiantes WHERE rut = $1 RETURNING *";
-    const result = await pool.query(text, values);
-    console.log("registro de estudiante con rut", result.rows[0].rut, "eliminado")
+    const client = await conectar();
+    try{
+        const proceso = process.argv.slice(2);
+        const consulta = {
+            text: "DELETE FROM estudiantes WHERE rut = $1 RETURNING *",
+            values: [proceso[2]],
+            rowMode: "array"
+        }
+        const result = await client.query(consulta);
+        console.log("registro de estudiante con rut", proceso[2], "eliminado")
+    }catch(err){
+        const { code } = err;
+        console.error("Error al consultar:", err);
+        console.error("Codigo de error:", code);
+    }finally{
+        client.release();
+    }
 };//ejemplo elimar por rut node server.js eliminar - '12.222.222-2'
 
 
-const proceso = process.argv.slice(2);  
+const proceso = process.argv.slice(2);
 switch(proceso[0]){
     case 'nuevo': registrarUsuario();
     break;
@@ -90,5 +154,19 @@ switch(proceso[0]){
     break;
 
     default: 
-    console.info("no se encontro tu solicitud")
+    console.log(chalk.bgRed("Error de solicitud:"));
+    console.info(chalk.bgGreen("Solicitud: Para agregar"));
+    console.info(chalk.bgWhite("node server.js nuevo 'Antonio' '12.222.222-2' 'JavaScript' 'Alto'"));
+    console.log("----------------------------------------------------------------------------");
+    console.info(chalk.bgGreen("Solicitud: Para consultar por rut"));
+    console.info(chalk.bgWhite("node server.js rut - '12.222.222-2'"));
+    console.log("-----------------------------------------------------------------------------");
+    console.info(chalk.bgGreen("Solicitud: Para editar"));
+    console.info(chalk.bgWhite("node server.js editar 'Luis' '14.444.444-4' 'Bootstrap' 'medio' 'id'"));
+    console.log("-----------------------------------------------------------------------------");
+    console.info(chalk.bgGreen("Solicitud para consultar todo"));
+    console.info(chalk.bgWhite("node server.js consulta"));
+    console.log("-----------------------------------------------------------------------------");
+    console.info(chalk.bgGreen("Solicitud para eliminar por rut"));
+    console.info(chalk.bgWhite("node server.js eliminar - '12.222.222-2'"));
 }
